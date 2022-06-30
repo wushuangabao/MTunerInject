@@ -78,6 +78,50 @@ void getStoragePath(char _path[512])
 #endif
 }
 
+int handleCMDWithPID(LPWSTR cmd, const char* _DLLPath)
+{
+	wchar_t* end = wcsstr(cmd, L"#pid#");
+	cmd = end + 5;
+	end = wcsstr(cmd, L"#pid#");
+	*end = L'\0';
+
+	wchar_t process_id_wc[16];
+	wcscpy(process_id_wc, cmd);
+
+	char process_id_ch[32];
+	wcstombs(process_id_ch, process_id_wc, 32);
+
+	uint32_t pid = atoi(process_id_ch);
+	if (!rdebug::processInjectDLL(&pid, _DLLPath))
+	{
+		err();
+	}
+
+	return pid;
+}
+
+int handleCMDUnloadPID(LPWSTR cmd)
+{
+	wchar_t* end = wcsstr(cmd, L"#end#");
+	cmd = end + 5;
+	end = wcsstr(cmd, L"#end#");
+	*end = L'\0';
+
+	wchar_t process_id_wc[16];
+	wcscpy(process_id_wc, cmd);
+
+	char process_id_ch[32];
+	wcstombs(process_id_ch, process_id_wc, 32);
+
+	uint32_t pid = atoi(process_id_ch);
+	if (!rdebug::processEjectDLL(&pid))
+	{
+		err();
+	}
+
+	return pid;
+}
+
 int main(int argc, const char** /*argv*/)
 {
 #if !RTM_PLATFORM_WINDOWS
@@ -118,7 +162,18 @@ int main(int argc, const char** /*argv*/)
 
 	wchar_t* end = wcsstr(cmd,L"#23#");
 	if (!end)
-		err();
+	{
+		end = wcsstr(cmd, L"#pid#");
+		if (!end)
+		{
+			end = wcsstr(cmd, L"#end#");
+			if (!end)
+				err();
+			else
+				return handleCMDUnloadPID(end);
+		}
+		return handleCMDWithPID(end, dllPathMulti);
+	}
 
 	end[-1] = L'\0';
 
